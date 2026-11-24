@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kesar &amp; Co. — AI Order-Support Copilot</title>
+  <style>
+    :root {
+      --bg: #faf8f5;
+      --surface: #ffffff;
+      --border: #e7e1d8;
+      --text: #1f2421;
+      --muted: #646b66;
+      --saffron: #c85a17;
+      --saffron-soft: #fdf0e6;
+      --forest: #1f5c43;
+      --forest-soft: #e8f4ee;
+      --warn: #9a5b13;
+      --warn-soft: #fef6e7;
+      --danger: #a62626;
+      --danger-soft: #fdecec;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); }
+    .brand p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 9px 15px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button:hover { border-color: var(--saffron); }
+    button.primary {
+      background: var(--saffron);
+      border-color: var(--saffron);
+      color: #fff;
+    }
+    button.primary:hover { opacity: 0.92; }
+    .container { max-width: 1280px; margin: 24px auto; padding: 0 24px 48px; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi .val { font-size: 26px; font-weight: 700; margin-top: 4px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: #f5f1ea; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    tr:hover td { background: #fcfaf7; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .b-ok { background: var(--forest-soft); color: var(--forest); }
+    .b-warn { background: var(--warn-soft); color: var(--warn); }
+    .b-danger { background: var(--danger-soft); color: var(--danger); }
+    .b-neutral { background: #efece6; color: var(--text); }
+    .draft-preview {
+      max-width: 360px;
+      white-space: pre-wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status-bar { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Kesar &amp; Co. — AI Order-Support Copilot</h1>
+      <p>Built by Harshit Jaiswal · Scenario Date: 20 Nov 2026 · Mode: <span id="modeLabel">Loading...</span></p>
+    </div>
+    <div class="controls">
+      <button onclick="runBatch('v1', 10)">Run v1 Baseline (10 Emails)</button>
+      <button class="primary" onclick="runBatch('v2', null)">Run v2 Copilot (All 25 Emails)</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="kpis">
+      <div class="kpi"><div class="label">Processed Emails</div><div class="val" id="kProcessed">0</div></div>
+      <div class="kpi"><div class="label">Orders Matched</div><div class="val" id="kOrders">0</div></div>
+      <div class="kpi"><div class="label">Deduplicated Tickets</div><div class="val" id="kTickets">0</div></div>
+      <div class="kpi"><div class="label">Human Escalations</div><div class="val" id="kHuman">0</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tabAuditBtn" onclick="switchTab('audit')">Audit Log</button>
+      <button class="tab" id="tabTicketsBtn" onclick="switchTab('tickets')">Support Tickets</button>
+    </div>
+
+    <div class="status-bar" id="statusBar">Ready. Click "Run v2 Copilot (All 25 Emails)" or inspect existing logs.</div>
+
+    <div class="panel" id="auditPanel">
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Intent</th>
+            <th>Order</th>
+            <th>Lang / Conf</th>
+            <th>Action</th>
+            <th>Ticket</th>
+            <th>Draft Reply / Notes</th>
+          </tr>
+        </thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="ticketsPanel" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticket ID</th>
+            <th>Order ID</th>
+            <th>Customer</th>
+            <th>Emails Linked</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="ticketsBody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    function switchTab(name) {
+      document.getElementById('auditPanel').style.display = name === 'audit' ? 'block' : 'none';
+      document.getElementById('ticketsPanel').style.display = name === 'tickets' ? 'block' : 'none';
+      document.getElementById('tabAuditBtn').classList.toggle('active', name === 'audit');
+      document.getElementById('tabTicketsBtn').classList.toggle('active', name === 'tickets');
+    }
+
+    function badgeForAction(action, needsHuman) {
+      if (needsHuman === 'true' || action === 'needs_human') return '<span class="badge b-danger">needs_human</span>';
+      if (action === 'ticket_and_draft') return '<span class="badge b-warn">ticket_and_draft</span>';
+      if (action === 'draft_reply') return '<span class="badge b-ok">draft_reply</span>';
+      return '<span class="badge b-neutral">' + action + '</span>';
+    }
+
+    async function loadData() {
+      const [healthRes, auditRes, ticketsRes] = await Promise.all([
+        fetch('/api/health').then(r => r.json()),
+        fetch('/api/audit-log').then(r => r.json()),
+        fetch('/api/tickets').then(r => r.json())
+      ]);
+      document.getElementById('modeLabel').textContent = healthRes.mode;
+      const rows = auditRes.rows || [];
+      const tickets = ticketsRes.rows || [];
+
+      document.getElementById('kProcessed').textContent = rows.length;
+      document.getElementById('kOrders').textContent = rows.filter(r => r.order_found === 'true').length;
+      document.getElementById('kTickets').textContent = tickets.length;
+      document.getElementById('kHuman').textContent = rows.filter(r => r.needs_human === 'true').length;
+
+      document.getElementById('auditBody').innerHTML = rows.map(r => `
+        <tr>
+          <td><strong>${r.email_id}</strong><br><span style="color:var(--muted);font-size:12px;">${r.from_email}</span></td>
+          <td><strong>${r.intent}</strong>${r.secondary_intent ? '<br><span style="color:var(--muted);font-size:11px;">+ ' + r.secondary_intent + '</span>' : ''}</td>
+          <td>${r.order_id || '—'}<br><span style="color:var(--muted);font-size:11px;">found: ${r.order_found}</span></td>
+          <td>${r.language} · ${r.confidence}</td>
+          <td>${badgeForAction(r.action_taken, r.needs_human)}</td>
+          <td>${r.ticket_id || '—'}</td>
+          <td><div class="draft-preview">${(r.reply_draft || r.notes || '—').replaceAll('\\n', '\n')}</div></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('ticketsBody').innerHTML = tickets.map(t => `
+        <tr>
+          <td><strong>${t.ticket_id}</strong></td>
+          <td>${t.order_id}</td>
+          <td>${t.customer_email}</td>
+          <td><strong>${t.email_ids}</strong></td>
+          <td><span class="badge ${t.priority === 'High' ? 'b-danger' : 'b-warn'}">${t.priority}</span></td>
+          <td>${t.status}</td>
+          <td style="font-size:12px;color:var(--muted);">${t.notes}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function runBatch(version, limit) {
+      document.getElementById('statusBar').textContent = `Running ${version} batch...`;
+      await fetch('/api/run-batch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ prompt_version: version, limit })
+      });
+      await loadData();
+      document.getElementById('statusBar').textContent = `Completed ${version} run.`;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

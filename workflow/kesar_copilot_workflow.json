@@ -1,0 +1,62 @@
+{
+  "name": "Kesar & Co. Support Copilot (FastAPI + Tool-Calling Agent)",
+  "version": "2.0.0",
+  "scenario_today": "2026-11-20",
+  "trigger": {
+    "type": "webhook",
+    "method": "POST",
+    "path": "/webhook/support-email",
+    "auth": "Optional X-Webhook-Secret header"
+  },
+  "nodes": [
+    {
+      "id": "1_ingest",
+      "name": "Webhook / Batch Ingest",
+      "type": "FastAPI Endpoint",
+      "description": "Validates incoming email JSON payload using Pydantic EmailPayload."
+    },
+    {
+      "id": "2_injection_scan",
+      "name": "Prompt Injection & Language Detector",
+      "type": "Guardrail",
+      "description": "Flags adversarial override patterns and detects en/hi/hinglish."
+    },
+    {
+      "id": "3_classify",
+      "name": "Structured Classifier",
+      "type": "LLM / Deterministic Agent",
+      "schema": "schemas/llm_output.schema.json",
+      "confidence_threshold": 0.75
+    },
+    {
+      "id": "4_agent_tools",
+      "name": "AI Agent Tool Loop",
+      "type": "Tool-Calling Agent",
+      "tools": [
+        "get_order (order_id -> email fallback + privacy check)",
+        "search_faq (data/faq.md grounded retrieval)",
+        "check_return_eligibility (received_at date math)",
+        "upsert_ticket (order_id deduplication in tickets.csv)"
+      ]
+    },
+    {
+      "id": "5_hitl_router",
+      "name": "Human-in-the-Loop Router",
+      "type": "Conditional Router",
+      "conditions": [
+        "confidence < 0.75",
+        "privacy_blocked == true",
+        "prompt_injection_detected == true",
+        "sentiment == angry",
+        "medical_or_out_of_scope == true",
+        "order_not_found == true"
+      ]
+    },
+    {
+      "id": "6_audit_log",
+      "name": "Audit Log & Ticket Persistence",
+      "type": "CSV / Google Sheets Sync",
+      "outputs": ["output/audit_log.csv", "output/tickets.csv"]
+    }
+  ]
+}
